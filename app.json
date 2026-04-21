@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "DinoFocus",
+    "slug": "dinofocus",
+    "version": "1.0.0",
+    "scheme": "dinofocus",
+    "web": { "bundler": "metro" },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2d8a55"
+        }
+      ]
+    ],
+    "android": { "adaptiveIcon": { "foregroundImage": "./assets/images/adaptive-icon.png" } },
+    "ios": { "supportsTablet": true }
+  }
+}

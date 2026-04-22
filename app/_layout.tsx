@@ -3,12 +3,14 @@ import { useEffect } from 'react';
 import { useGameStore } from '../src/store/gameStore';
 import { useMissionStore } from '../src/store/missionStore';
 import { useParentStore } from '../src/store/parentStore';
+import { useWeeklyStore } from '../src/store/weeklyStore';
 import { scheduleInactivityNotification } from '../src/utils/notifications';
 
 export default function RootLayout() {
   const loadGame = useGameStore(s => s.loadFromStorage);
   const loadMissions = useMissionStore(s => s.loadFromStorage);
   const loadParent = useParentStore(s => s.loadFromStorage);
+  const loadWeekly = useWeeklyStore(s => s.loadFromStorage);
   const recordAppOpen = useGameStore(s => s.recordAppOpen);
 
   useEffect(() => {
@@ -16,6 +18,7 @@ export default function RootLayout() {
       await loadGame();
       await loadMissions();
       await loadParent();
+      await loadWeekly();
       recordAppOpen();
       scheduleInactivityNotification();
     })();
@@ -24,7 +27,15 @@ export default function RootLayout() {
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="parent" options={{ presentation: 'modal', title: 'Mode Parent 👨‍👩‍👧', headerStyle: { backgroundColor: '#1a1a2e' }, headerTintColor: '#fff' }} />
+      <Stack.Screen
+        name="parent"
+        options={{
+          presentation: 'modal',
+          title: 'Mode Parent 👨‍👩‍👧',
+          headerStyle: { backgroundColor: '#1a1a2e' },
+          headerTintColor: '#fff',
+        }}
+      />
     </Stack>
   );
 }

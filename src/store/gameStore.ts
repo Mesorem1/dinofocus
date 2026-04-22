@@ -31,6 +31,16 @@ interface GameState {
   lastOpenedAt: string | null;
   sessionStartedAt: string | null;
 
+  // Progression & Rewards
+  totalMissionsCompleted: number;
+  chestCount: number;
+
+  // Weekly report tracking
+  weeklyXP: number;
+  weeklyMissions: number;
+  weeklyGames: number;
+  weekStartDate: string | null;
+
   // Tamagotchi
   tama: TamagotchiStats;
 
@@ -40,6 +50,9 @@ interface GameState {
   recordAppOpen: () => void;
   startSession: () => void;
   loadFromStorage: () => Promise<void>;
+  incrementMissionsCompleted: () => void;
+  incrementChestCount: () => void;
+  checkAndResetWeekly: () => void;
 
   // Tamagotchi actions
   feedDino: () => void;
@@ -82,6 +95,15 @@ const DEFAULT_TAMA: TamagotchiStats = {
   lastUpdatedAt: null,
 };
 
+function getMondayDateString(): string {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon ...
+  const diff = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toDateString();
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   totalXP: 0,
   activeDinoId: 'rex',
@@ -92,10 +114,21 @@ export const useGameStore = create<GameState>((set, get) => ({
   sessionStartedAt: null,
   tama: DEFAULT_TAMA,
 
+  // Progression counters
+  totalMissionsCompleted: 0,
+  chestCount: 0,
+
+  // Weekly tracking
+  weeklyXP: 0,
+  weeklyMissions: 0,
+  weeklyGames: 0,
+  weekStartDate: null,
+
   addXP: (amount) => {
-    const newTotal = get().totalXP + amount;
+    const state = get();
+    const newTotal = state.totalXP + amount;
     // Gain XP → boost happiness
-    const tama = get().tama;
+    const tama = state.tama;
     const newTama = {
       ...tama,
       happiness: clamp(tama.happiness + 15),
@@ -103,8 +136,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastUpdatedAt: new Date().toISOString(),
     };
     newTama.health = computeHealth(newTama);
-    set({ totalXP: newTotal, tama: newTama, dinoMood: moodFromStats(newTama) });
-    saveData(STORAGE_KEYS.GAME, { ...get(), totalXP: newTotal, tama: newTama });
+    const weeklyXP = state.weeklyXP + amount;
+    set({ totalXP: newTotal, tama: newTama, dinoMood: moodFromStats(newTama), weeklyXP });
+    saveData(STORAGE_KEYS.GAME, { ...get(), totalXP: newTotal, tama: newTama, weeklyXP });
     return newTotal;
   },
 
@@ -114,9 +148,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   recordGameWin: () => {
-    const gamesWon = get().gamesWon + 1;
+    const state = get();
+    const gamesWon = state.gamesWon + 1;
+    const weeklyGames = state.weeklyGames + 1;
     // Winning a game drains energy, boosts happiness
-    const tama = get().tama;
+    const tama = state.tama;
     const newTama = {
       ...tama,
       happiness: clamp(tama.happiness + 10),
@@ -125,8 +161,42 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastUpdatedAt: new Date().toISOString(),
     };
     newTama.health = computeHealth(newTama);
-    set({ gamesWon, tama: newTama });
-    saveData(STORAGE_KEYS.GAME, { ...get(), gamesWon, tama: newTama });
+    set({ gamesWon, tama: newTama, weeklyGames });
+    saveData(STORAGE_KEYS.GAME, { ...get(), gamesWon, tama: newTama, weeklyGames });
+  },
+
+  incrementMissionsCompleted: () => {
+    const state = get();
+    const totalMissionsCompleted = state.totalMissionsCompleted + 1;
+    const weeklyMissions = state.weeklyMissions + 1;
+    set({ totalMissionsCompleted, weeklyMissions });
+    saveData(STORAGE_KEYS.GAME, { ...get(), totalMissionsCompleted, weeklyMissions });
+  },
+
+  incrementChestCount: () => {
+    const chestCount = get().chestCount + 1;
+    set({ chestCount });
+    saveData(STORAGE_KEYS.GAME, { ...get(), chestCount });
+  },
+
+  checkAndResetWeekly: () => {
+    const currentMonday = getMondayDateString();
+    const state = get();
+    if (state.weekStartDate !== currentMonday) {
+      set({
+        weeklyXP: 0,
+        weeklyMissions: 0,
+        weeklyGames: 0,
+        weekStartDate: currentMonday,
+      });
+      saveData(STORAGE_KEYS.GAME, {
+        ...get(),
+        weeklyXP: 0,
+        weeklyMissions: 0,
+        weeklyGames: 0,
+        weekStartDate: currentMonday,
+      });
+    }
   },
 
   recordAppOpen: () => {
@@ -147,6 +217,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const mood = moodFromStats(decayed);
     set({ lastOpenedAt: now, streak, tama: decayed, dinoMood: mood });
     saveData(STORAGE_KEYS.GAME, { ...get(), lastOpenedAt: now, streak, tama: decayed, dinoMood: mood });
+
+    // Check if week reset needed
+    get().checkAndResetWeekly();
   },
 
   startSession: () => {

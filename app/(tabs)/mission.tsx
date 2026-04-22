@@ -2,15 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { useMissionStore } from '../../src/store/missionStore';
 import { useGameStore } from '../../src/store/gameStore';
+import { useWeeklyStore } from '../../src/store/weeklyStore';
 import { MissionCard } from '../../src/components/MissionCard';
 import { Confetti } from '../../src/components/Confetti';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { getNewlyUnlockedDino } from '../../src/utils/progression';
+import { useSounds } from '../../src/hooks/useSounds';
 
 export default function MissionScreen() {
   const { dailyMissions, currentIndex, completedToday, completeMission } = useMissionStore();
-  const { totalXP, addXP, setDinoMood } = useGameStore();
+  const { totalXP, addXP, setDinoMood, incrementMissionsCompleted } = useGameStore();
+  const { updateProgress } = useWeeklyStore();
   const { success } = useHaptics();
+  const { playMission } = useSounds();
   const [showConfetti, setShowConfetti] = useState(false);
   const [unlockedDino, setUnlockedDino] = useState<string | null>(null);
 
@@ -20,12 +24,16 @@ export default function MissionScreen() {
   const handleComplete = () => {
     if (!currentMission) return;
     success();
+    playMission();
     setShowConfetti(true);
     const newXP = addXP(currentMission.xpReward);
     const newly = getNewlyUnlockedDino(totalXP, newXP);
     if (newly) setUnlockedDino(newly.name);
     setDinoMood('happy');
     completeMission();
+    incrementMissionsCompleted();
+    // Update weekly challenges
+    updateProgress('complete_missions', 1);
     setTimeout(() => setShowConfetti(false), 2000);
   };
 

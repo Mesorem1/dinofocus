@@ -4,6 +4,7 @@ import {
   SafeAreaView, ScrollView,
 } from 'react-native';
 import { useGameStore } from '../../src/store/gameStore';
+import { useWeeklyStore } from '../../src/store/weeklyStore';
 import { useSessionTimer } from '../../src/hooks/useSessionTimer';
 import { MemoryGame } from '../../src/games/MemoryGame';
 import { EggHuntGame } from '../../src/games/EggHuntGame';
@@ -88,10 +89,11 @@ export default function GamesScreen() {
   const [activeGame, setActiveGame] = useState<ActiveGame>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [lastXP, setLastXP] = useState(0);
-  const { addXP, recordGameWin, setDinoMood } = useGameStore();
+  const { addXP, recordGameWin, setDinoMood, incrementMissionsCompleted } = useGameStore();
+  const { updateProgress } = useWeeklyStore();
   const { isResting, resumeSession } = useSessionTimer();
   const { success } = useHaptics();
-  const { playWin, playGameStart, playTap } = useSounds();
+  const { playWin, playGameStart } = useSounds();
 
   const handleWin = (xp: number) => {
     success(); playWin();
@@ -100,6 +102,9 @@ export default function GamesScreen() {
     setDinoMood('energetic');
     setLastXP(xp);
     setShowConfetti(true);
+    // Count game win as a completed mission for progression & weekly
+    incrementMissionsCompleted();
+    updateProgress('win_games', 1);
     setTimeout(() => {
       setShowConfetti(false);
       setActiveGame(null);

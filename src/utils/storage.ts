@@ -29,4 +29,5 @@ export const STORAGE_KEYS = {
   GAME: 'dinofocus:game',
   MISSIONS: 'dinofocus:missions',
   PARENT: 'dinofocus:parent',
+  WEEKLY: 'dinofocus:weekly',
 } as const;

@@ -6,11 +6,18 @@ interface ParentState {
   sessionDurationMinutes: 10 | 5 | 15;
   notificationsEnabled: boolean;
   isUnlocked: boolean;
+  dinoName: string;
+  musicEnabled: boolean;
+  bedtimeHour: number | null;
+
   setPin: (pin: string) => void;
   unlock: (pin: string) => boolean;
   lock: () => void;
   setSessionDuration: (minutes: 5 | 10 | 15) => void;
   toggleNotifications: () => void;
+  setDinoName: (name: string) => void;
+  toggleMusic: () => void;
+  setBedtimeHour: (hour: number | null) => void;
   loadFromStorage: () => Promise<void>;
 }
 
@@ -19,6 +26,9 @@ export const useParentStore = create<ParentState>((set, get) => ({
   sessionDurationMinutes: 10,
   notificationsEnabled: true,
   isUnlocked: false,
+  dinoName: 'Rex',
+  musicEnabled: true,
+  bedtimeHour: null,
 
   setPin: (pin) => {
     set({ pin });
@@ -44,6 +54,22 @@ export const useParentStore = create<ParentState>((set, get) => ({
     const enabled = !get().notificationsEnabled;
     set({ notificationsEnabled: enabled });
     saveData(STORAGE_KEYS.PARENT, { ...get(), notificationsEnabled: enabled });
+  },
+
+  setDinoName: (name) => {
+    set({ dinoName: name });
+    saveData(STORAGE_KEYS.PARENT, { ...get(), dinoName: name });
+  },
+
+  toggleMusic: () => {
+    const musicEnabled = !get().musicEnabled;
+    set({ musicEnabled });
+    saveData(STORAGE_KEYS.PARENT, { ...get(), musicEnabled });
+  },
+
+  setBedtimeHour: (hour) => {
+    set({ bedtimeHour: hour });
+    saveData(STORAGE_KEYS.PARENT, { ...get(), bedtimeHour: hour });
   },
 
   loadFromStorage: async () => {

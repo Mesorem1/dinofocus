@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView,
-  TouchableOpacity, Animated as RNAnimated,
+  TouchableOpacity, Animated as RNAnimated, ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '../../src/store/gameStore';
@@ -9,10 +9,17 @@ import { useMissionStore } from '../../src/store/missionStore';
 import { DinoCompanion } from '../../src/components/DinoCompanion';
 import { XPBar } from '../../src/components/XPBar';
 import { PinModal } from '../../src/components/PinModal';
+import { LevelUpModal } from '../../src/components/LevelUpModal';
+import { ChestModal } from '../../src/components/ChestModal';
+import { WeeklyChallenges } from '../../src/components/WeeklyChallenges';
+import { BedtimeLock } from '../../src/components/BedtimeLock';
 import { useParentStore } from '../../src/store/parentStore';
 import { useDinoMood } from '../../src/hooks/useDinoMood';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { useSounds } from '../../src/hooks/useSounds';
+import { useBackgroundMusic } from '../../src/hooks/useBackgroundMusic';
+import { useWeeklyStore } from '../../src/store/weeklyStore';
+import { calculateLevel } from '../../src/utils/progression';
 
 // ── Stat Bar ──────────────────────────────────────────────────────────────────
 interface StatBarProps {
@@ -98,22 +105,101 @@ const MOOD_TEXT: Record<string, { text: string; color: string }> = {
 export default function HomeScreen() {
   const totalXP = useGameStore(s => s.totalXP);
   const tama = useGameStore(s => s.tama);
-  const { feedDino, petDino, restDino, updateTamaStats } = useGameStore();
+  const totalMissionsCompleted = useGameStore(s => s.totalMissionsCompleted);
+  const chestCount = useGameStore(s => s.chestCount);
+  const { feedDino, petDino, restDino, updateTamaStats, addXP, incrementChestCount } = useGameStore();
   const { dailyMissions, currentIndex, completedToday } = useMissionStore();
-  const { pin, unlock } = useParentStore();
+  const { pin, unlock, dinoName, musicEnabled, toggleMusic, bedtimeHour } = useParentStore();
+  const { updateProgress } = useWeeklyStore();
   const mood = useDinoMood();
-  const { tap, success } = useHaptics();
-  const { playFeed, playPet, playRest, playMission, playTap } = useSounds();
+  const { tap } = useHaptics();
+  const sounds = useSounds();
+  const {
+    playFeed, playPet, playRest, playTap,
+    playLevelUp, playChest,
+    playRexHappy, playRexSad, playRexHungry, playRexTired,
+  } = sounds;
+
+  // Background music
+  useBackgroundMusic();
+
   const [showPin, setShowPin] = useState(false);
   const [feedAnim, setFeedAnim] = useState('');
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [newLevel, setNewLevel] = useState(1);
+  const [showChest, setShowChest] = useState(false);
+
   const logoTapCount = useRef(0);
   const logoTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevLevelRef = useRef(calculateLevel(totalXP));
+  const prevMoodRef = useRef(mood);
+  const prevMissionsRef = useRef(totalMissionsCompleted);
 
   // Refresh stats every 60s while app is open
   useEffect(() => {
     const interval = setInterval(() => updateTamaStats(), 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Detect level-up
+  useEffect(() => {
+    const currentLevel = calculateLevel(totalXP);
+    if (currentLevel > prevLevelRef.current) {
+      prevLevelRef.current = currentLevel;
+      setNewLevel(currentLevel);
+      setShowLevelUp(true);
+      playLevelUp();
+    }
+  }, [totalXP]);
+
+  // Detect chest (every 5 missions)
+  useEffect(() => {
+    if (totalMissionsCompleted === 0) return;
+    const missionsForChests = Math.floor(totalMissionsCompleted / 5);
+    if (missionsForChests > chestCount) {
+      incrementChestCount();
+      // Small delay so level-up modal doesn't overlap
+      setTimeout(() => {
+        setShowChest(true);
+        playChest();
+      }, showLevelUp ? 1500 : 400);
+    }
+    prevMissionsRef.current = totalMissionsCompleted;
+  }, [totalMissionsCompleted]);
+
+  // Rex voice — react to mood changes
+  useEffect(() => {
+    if (prevMoodRef.current === mood) return;
+    prevMoodRef.current = mood;
+    if (tama.hunger < 30) {
+      playRexHungry();
+    } else if (tama.energy < 30) {
+      playRexTired();
+    } else if (mood === 'happy' || mood === 'energetic') {
+      playRexHappy();
+    } else if (mood === 'sad') {
+      playRexSad();
+    }
+  }, [mood]);
+
+  const handleRexTap = useCallback(() => {
+    // Play Rex voice when user taps Rex
+    if (tama.hunger < 30) {
+      playRexHungry();
+    } else if (tama.energy < 30) {
+      playRexTired();
+    } else if (mood === 'sad') {
+      playRexSad();
+    } else {
+      playRexHappy();
+    }
+  }, [mood, tama.hunger, tama.energy]);
+
+  const handleChestClose = () => {
+    setShowChest(false);
+    // Grant the +20 XP bonus
+    addXP(20);
+  };
 
   const currentMission = dailyMissions[currentIndex];
 
@@ -141,6 +227,7 @@ export default function HomeScreen() {
     if (tama.hunger >= 100) return;
     tap(); playFeed();
     feedDino();
+    updateProgress('feed_rex', 1);
     setFeedAnim('🍖');
     setTimeout(() => setFeedAnim(''), 1200);
   };
@@ -162,95 +249,123 @@ export default function HomeScreen() {
   };
 
   const moodInfo = MOOD_TEXT[mood] ?? MOOD_TEXT.happy;
-  const dinoName = 'Rex';
+
+  // Bedtime lock check
+  const isBedtime = bedtimeHour !== null && new Date().getHours() >= bedtimeHour;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <TouchableOpacity onPress={handleLogoTap} style={styles.logoArea}>
-        <Text style={styles.appName}>🦕 DinoFocus</Text>
-      </TouchableOpacity>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={handleLogoTap} style={styles.logoArea}>
+          <Text style={styles.appName}>🦕 DinoFocus</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { tap(); toggleMusic(); }} style={styles.musicBtn}>
+          <Text style={styles.musicIcon}>{musicEnabled ? '🎵' : '🔇'}</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Dino Stage */}
-      <View style={styles.dinoStage}>
-        {/* Floating action emoji */}
-        {feedAnim !== '' && (
-          <Text style={styles.feedAnim}>{feedAnim}</Text>
-        )}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {/* Dino Stage */}
+        <View style={styles.dinoStage}>
+          {feedAnim !== '' && (
+            <Text style={styles.feedAnim}>{feedAnim}</Text>
+          )}
 
-        <DinoCompanion
-          mood={mood}
-          size={100}
-          hunger={tama.hunger}
-          happiness={tama.happiness}
-          energy={tama.energy}
-        />
+          <TouchableOpacity onPress={handleRexTap} activeOpacity={0.9}>
+            <DinoCompanion
+              mood={mood}
+              size={100}
+              hunger={tama.hunger}
+              happiness={tama.happiness}
+              energy={tama.energy}
+            />
+          </TouchableOpacity>
 
-        <View style={styles.nameRow}>
-          <Text style={styles.dinoName}>{dinoName}</Text>
-          <View style={[styles.moodPill, { backgroundColor: moodInfo.color + '33' }]}>
-            <Text style={[styles.moodText, { color: moodInfo.color }]}>{moodInfo.text}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.dinoName}>{dinoName}</Text>
+            <View style={[styles.moodPill, { backgroundColor: moodInfo.color + '33' }]}>
+              <Text style={[styles.moodText, { color: moodInfo.color }]}>{moodInfo.text}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* XP Bar */}
-      <View style={styles.xpWrap}>
-        <XPBar totalXP={totalXP} />
-      </View>
+        {/* XP Bar */}
+        <View style={styles.xpWrap}>
+          <XPBar totalXP={totalXP} />
+        </View>
 
-      {/* Tamagotchi Stats */}
-      <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>État de Rex</Text>
-        <StatBar label="FAIM" emoji="🍖" value={tama.hunger} color="#22c55e" />
-        <StatBar label="BONHEUR" emoji="😊" value={tama.happiness} color="#f59e0b" />
-        <StatBar label="ÉNERGIE" emoji="⚡" value={tama.energy} color="#3b82f6" />
-        <StatBar label="SANTÉ" emoji="❤️" value={tama.health} color="#ec4899" />
-      </View>
+        {/* Tamagotchi Stats */}
+        <View style={styles.statsCard}>
+          <Text style={styles.statsTitle}>État de {dinoName}</Text>
+          <StatBar label="FAIM" emoji="🍖" value={tama.hunger} color="#22c55e" />
+          <StatBar label="BONHEUR" emoji="😊" value={tama.happiness} color="#f59e0b" />
+          <StatBar label="ÉNERGIE" emoji="⚡" value={tama.energy} color="#3b82f6" />
+          <StatBar label="SANTÉ" emoji="❤️" value={tama.health} color="#ec4899" />
+        </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actions}>
-        <ActionBtn
-          emoji="🍖"
-          label="Nourrir"
-          color="#16a34a"
-          onPress={handleFeed}
-          disabled={tama.hunger >= 100}
-        />
-        <ActionBtn
-          emoji="💖"
-          label="Câlin"
-          color="#db2777"
-          onPress={handlePet}
-          disabled={tama.happiness >= 100}
-        />
-        <ActionBtn
-          emoji="💤"
-          label="Dormir"
-          color="#2563eb"
-          onPress={handleRest}
-          disabled={tama.energy >= 100}
-        />
-      </View>
+        {/* Action Buttons */}
+        <View style={styles.actions}>
+          <ActionBtn
+            emoji="🍖"
+            label="Nourrir"
+            color="#16a34a"
+            onPress={handleFeed}
+            disabled={tama.hunger >= 100}
+          />
+          <ActionBtn
+            emoji="💖"
+            label="Câlin"
+            color="#db2777"
+            onPress={handlePet}
+            disabled={tama.happiness >= 100}
+          />
+          <ActionBtn
+            emoji="💤"
+            label="Dormir"
+            color="#2563eb"
+            onPress={handleRest}
+            disabled={tama.energy >= 100}
+          />
+        </View>
 
-      {/* Mission Preview */}
-      {currentMission && (
-        <TouchableOpacity
-          style={styles.missionPreview}
-          onPress={() => { tap(); playTap(); router.push('/mission'); }}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.missionIcon}>{currentMission.icon}</Text>
-          <View style={styles.missionText}>
-            <Text style={styles.missionLabel}>🎯 Mission du jour</Text>
-            <Text style={styles.missionTitle} numberOfLines={1}>{currentMission.dinoTitle}</Text>
-            <Text style={styles.missionProgress}>
-              {completedToday} / {dailyMissions.length} complétées · +{currentMission.xpReward} XP
-            </Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-      )}
+        {/* Mission Preview */}
+        {currentMission && (
+          <TouchableOpacity
+            style={styles.missionPreview}
+            onPress={() => { tap(); playTap(); router.push('/mission'); }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.missionIcon}>{currentMission.icon}</Text>
+            <View style={styles.missionText}>
+              <Text style={styles.missionLabel}>🎯 Mission du jour</Text>
+              <Text style={styles.missionTitle} numberOfLines={1}>{currentMission.dinoTitle}</Text>
+              <Text style={styles.missionProgress}>
+                {completedToday} / {dailyMissions.length} complétées · +{currentMission.xpReward} XP
+              </Text>
+            </View>
+            <Text style={styles.arrow}>›</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Weekly Challenges */}
+        <WeeklyChallenges />
+      </ScrollView>
+
+      {/* Bedtime Lock overlay */}
+      {isBedtime && <BedtimeLock dinoName={dinoName} />}
+
+      {/* Modals */}
+      <LevelUpModal
+        visible={showLevelUp}
+        level={newLevel}
+        onClose={() => setShowLevelUp(false)}
+      />
+
+      <ChestModal
+        visible={showChest}
+        onClose={handleChestClose}
+      />
 
       <PinModal
         visible={showPin}
@@ -264,8 +379,20 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d3b2e' },
-  logoArea: { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
+  scroll: { paddingBottom: 24 },
+
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  logoArea: { flex: 1, alignItems: 'flex-start' },
   appName: { fontSize: 24, fontWeight: '900', color: '#f9c74f', letterSpacing: 1 },
+  musicBtn: { padding: 8 },
+  musicIcon: { fontSize: 24 },
 
   dinoStage: {
     alignItems: 'center',
@@ -315,6 +442,7 @@ const styles = StyleSheet.create({
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
   },
   missionIcon: { fontSize: 32, marginRight: 12 },
   missionText: { flex: 1 },

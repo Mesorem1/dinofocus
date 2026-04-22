@@ -15,7 +15,8 @@
           "icon": "./assets/icon.png",
           "color": "#2d8a55"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "android": {
       "adaptiveIcon": {

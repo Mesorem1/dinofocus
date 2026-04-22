@@ -4,18 +4,33 @@
     "slug": "dinofocus",
     "version": "1.0.0",
     "scheme": "dinofocus",
-    "web": { "bundler": "metro" },
+    "web": {
+      "bundler": "metro"
+    },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
+          "icon": "./assets/icon.png",
           "color": "#2d8a55"
         }
       ]
     ],
-    "android": { "adaptiveIcon": { "foregroundImage": "./assets/images/adaptive-icon.png" } },
-    "ios": { "supportsTablet": true }
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "package": "com.mesorem.dinofocus"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "25f2e65c-2658-40d4-96d4-0c783042f88e"
+      }
+    }
   }
 }

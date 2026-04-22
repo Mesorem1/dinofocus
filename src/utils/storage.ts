@@ -10,11 +10,19 @@ export async function loadData<T>(key: string, defaultValue: T): Promise<T> {
 }
 
 export async function saveData<T>(key: string, value: T): Promise<void> {
-  await AsyncStorage.setItem(key, JSON.stringify(value));
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage full or serialization error — fail silently
+  }
 }
 
 export async function clearData(key: string): Promise<void> {
-  await AsyncStorage.removeItem(key);
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch {
+    // ignore removal errors
+  }
 }
 
 export const STORAGE_KEYS = {

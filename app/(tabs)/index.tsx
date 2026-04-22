@@ -12,6 +12,7 @@ import { PinModal } from '../../src/components/PinModal';
 import { useParentStore } from '../../src/store/parentStore';
 import { useDinoMood } from '../../src/hooks/useDinoMood';
 import { useHaptics } from '../../src/hooks/useHaptics';
+import { useSounds } from '../../src/hooks/useSounds';
 
 // ── Stat Bar ──────────────────────────────────────────────────────────────────
 interface StatBarProps {
@@ -102,6 +103,7 @@ export default function HomeScreen() {
   const { pin, unlock } = useParentStore();
   const mood = useDinoMood();
   const { tap, success } = useHaptics();
+  const { playFeed, playPet, playRest, playMission, playTap } = useSounds();
   const [showPin, setShowPin] = useState(false);
   const [feedAnim, setFeedAnim] = useState('');
   const logoTapCount = useRef(0);
@@ -137,7 +139,7 @@ export default function HomeScreen() {
 
   const handleFeed = () => {
     if (tama.hunger >= 100) return;
-    tap();
+    tap(); playFeed();
     feedDino();
     setFeedAnim('🍖');
     setTimeout(() => setFeedAnim(''), 1200);
@@ -145,7 +147,7 @@ export default function HomeScreen() {
 
   const handlePet = () => {
     if (tama.happiness >= 100) return;
-    tap();
+    tap(); playPet();
     petDino();
     setFeedAnim('💖');
     setTimeout(() => setFeedAnim(''), 1200);
@@ -153,7 +155,7 @@ export default function HomeScreen() {
 
   const handleRest = () => {
     if (tama.energy >= 100) return;
-    tap();
+    tap(); playRest();
     restDino();
     setFeedAnim('⭐');
     setTimeout(() => setFeedAnim(''), 1200);
@@ -235,7 +237,7 @@ export default function HomeScreen() {
       {currentMission && (
         <TouchableOpacity
           style={styles.missionPreview}
-          onPress={() => { tap(); router.push('/mission'); }}
+          onPress={() => { tap(); playTap(); router.push('/mission'); }}
           activeOpacity={0.85}
         >
           <Text style={styles.missionIcon}>{currentMission.icon}</Text>

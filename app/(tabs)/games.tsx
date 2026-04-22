@@ -12,6 +12,7 @@ import { DinoRunnerGame } from '../../src/games/DinoRunnerGame';
 import { ColorMatchGame } from '../../src/games/ColorMatchGame';
 import { Confetti } from '../../src/components/Confetti';
 import { useHaptics } from '../../src/hooks/useHaptics';
+import { useSounds } from '../../src/hooks/useSounds';
 
 type ActiveGame = 'memory' | 'eggs' | 'puzzle' | 'runner' | 'colors' | null;
 
@@ -90,9 +91,10 @@ export default function GamesScreen() {
   const { addXP, recordGameWin, setDinoMood } = useGameStore();
   const { isResting, resumeSession } = useSessionTimer();
   const { success } = useHaptics();
+  const { playWin, playGameStart, playTap } = useSounds();
 
   const handleWin = (xp: number) => {
-    success();
+    success(); playWin();
     addXP(xp);
     recordGameWin();
     setDinoMood('energetic');
@@ -143,7 +145,7 @@ export default function GamesScreen() {
             <TouchableOpacity
               key={game.id}
               style={styles.gameCard}
-              onPress={() => setActiveGame(game.id)}
+              onPress={() => { playGameStart(); setActiveGame(game.id); }}
               activeOpacity={0.9}
             >
               {/* Left color strip */}

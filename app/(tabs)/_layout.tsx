@@ -16,9 +16,10 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Accueil', tabBarIcon: () => <TabIcon emoji="🏠" /> }} />
-      <Tabs.Screen name="mission" options={{ title: 'Mission', tabBarIcon: () => <TabIcon emoji="🎯" /> }} />
+      <Tabs.Screen name="mission" options={{ title: 'Missions', tabBarIcon: () => <TabIcon emoji="🎯" /> }} />
       <Tabs.Screen name="games" options={{ title: 'Jeux', tabBarIcon: () => <TabIcon emoji="🎮" /> }} />
       <Tabs.Screen name="dinodex" options={{ title: 'Dino-Dex', tabBarIcon: () => <TabIcon emoji="🦕" /> }} />
+      <Tabs.Screen name="settings" options={{ title: 'Réglages', tabBarIcon: () => <TabIcon emoji="⚙️" /> }} />
     </Tabs>
   );
 }
